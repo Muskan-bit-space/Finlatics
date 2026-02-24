@@ -1,4 +1,4 @@
-# QuantNova Fund — MERN MVP
+# QuantNova 
 
 ## Quickstart
 
