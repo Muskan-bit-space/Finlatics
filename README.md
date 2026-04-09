@@ -1,4 +1,4 @@
-# QuantNova 
+# Finlatics
 
 ## Quickstart
 
