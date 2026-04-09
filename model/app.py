@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from ml import predict_next_day_return
 
 app = FastAPI(
-    title="QuantNova ML Engine",
+    title="Finlatics ML Engine",
     description="Machine learning service for market analytics",
     version="1.0"
 )
