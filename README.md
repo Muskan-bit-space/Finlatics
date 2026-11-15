@@ -299,7 +299,7 @@ app.get("/api/ml/predict")              ← too late if the "*" route exists
 app.listen(port || 5000)
 ```
 
-`axios` is imported on line 10. Node resolves imports before any of the code above runs. If `axios` is not installed, **the process crashes before Mongo connects and before `listen`**. `npm install` from the current `package.json` does not install it.
+`axios` is imported on line 10. Node resolves imports before any of the code above runs. If `axios` is not installed, **the process crashes before Mongo connects and before** `listen`. `npm install` from the current `package.json` does not install it.
 
 ## Frontend: `npm run dev` inside `client/`
 
@@ -355,54 +355,71 @@ Nothing starts this process automatically. Express assumes it is already on port
 # PHASE 4 — TECHNOLOGY STACK
 
 ### React
+
 UI library. Function components and hooks only (`useState`, `useEffect`, `useMemo`, `useRef`). No class components. Removing it removes the entire client.
 
 ### React DOM `createRoot`
+
 Mounts the tree into `#root` in `main.jsx`. One call. That is the frontend process start.
 
 ### Vite
+
 Dev server, bundler, and env injection (`import.meta.env.VITE_*`). `vite.config.js` proxies `/api` during dev so a relative `/api/...` call hits Express. Axios does **not** use a relative URL; it uses an absolute `baseURL`, so the proxy only helps if something calls `/api` on the Vite origin. Today the pages use the Axios absolute URL, and the chart uses Render. The proxy is mostly unused by current calls.
 
 ### React Router (`BrowserRouter`, `Routes`, `Route`, `Link`, `NavLink`)
+
 Client-side URLs with no page reload. Declared only in `App.jsx` and used by `Nav` and `Landing`. There is no loader, no protected route, no nested route layout beyond Nav/Footer wrapping everything.
 
 ### Axios
+
 `client/src/api.js` creates one instance. Pages call `api.get` / `api.post`. `fetchReturnPrediction` wraps `GET /api/ml/predict` and returns `null` on failure. Server-side `import axios from "axios"` is a second, undeclared use.
 
 ### Chart.js and react-chartjs-2
+
 Only `VolatilityChart.jsx`. Registers `LineElement`, `PointElement`, `LinearScale`, `CategoryScale`, `Tooltip`, `Legend`, `Filler`, then renders `<Line>`. Removing them blanks the chart page only.
 
 ### Express
+
 HTTP server. All behavior is in `server.js`. JSON in, JSON or a file out.
 
 ### Mongoose
+
 ODM for MongoDB. Connects in `server.js`, schema in `Lead.js`, one call: `Lead.create`. Removing it removes lead storage. The rest of the site still runs only if you also remove the connect-or-exit block; today a failed Mongo connection kills the whole API, including stats and the allocator.
 
 ### cors
+
 Sets `Access-Control-Allow-Origin` to a **single** origin. Browsers on a different origin (Vercel vs localhost, or Render) will block Axios calls unless `CLIENT_ORIGIN` matches the page’s origin. The volatility `fetch` to Render is cross-origin the other way: the chart page must be allowed by Render, which this repo cannot see.
 
 ### morgan
+
 Dev request logger. Safe to remove; no behavior depends on it.
 
 ### dotenv
+
 Loads `server/.env`. Without it, `MONGODB_URI` is missing and the process exits.
 
 ### node-fetch
+
 Used only by `GET /api/volatility` to call `MODEL_ORIGIN`. Node 18+ has global `fetch`; this dependency is the explicit one.
 
 ### FastAPI + Uvicorn
+
 Python HTTP for `GET /predict`. Uvicorn is the process that binds port 8000. Not imported by Node.
 
 ### pandas
+
 Builds the return column and the feature matrix in `ml.py`.
 
 ### scikit-learn `LinearRegression`
+
 Fit on each request. No model file is saved.
 
 ### yfinance
+
 Downloads daily OHLCV. Needs outbound internet. This is the market-data dependency.
 
 ### ESLint
+
 `npm run lint` in the client. Does not run in the request path.
 
 ---
@@ -575,7 +592,7 @@ Startup is not a request: Mongo connects before `listen`. If it fails, there is 
 
 **GET /api/ml/predict.** Requires `ticker`. Calls `http://localhost:8000/predict` with that query param. Returns `response.data` as-is: `{ ticker, predicted_return }`. Network or HTTP errors become 500 `"ML prediction service unavailable"`. The URL is hardcoded. It does not use `MODEL_ORIGIN`.
 
-**SPA `GET *`.** Registered only when `client/dist` exists, and registered **before** `/api/ml/predict`. A request to `/api/ml/predict` in that mode matches `*` first. The handler sees a path starting with `/api` and returns **404 `{ error: "Not found" }`**. The ML route never runs. Other `/api` routes still work because they were registered earlier.
+**SPA** `GET` ***.** Registered only when `client/dist` exists, and registered **before** `/api/ml/predict`. A request to `/api/ml/predict` in that mode matches `*` first. The handler sees a path starting with `/api` and returns **404** `{ error: "Not found" }`. The ML route never runs. Other `/api` routes still work because they were registered earlier.
 
 ---
 
@@ -583,9 +600,9 @@ Startup is not a request: Mongo connects before `listen`. If it fails, there is 
 
 ## What is stored
 
-One MongoDB database, name **`quantnova`** (second argument to `mongoose.connect`, so it wins over a database name in the URI).
+One MongoDB database, name `quantnova` (second argument to `mongoose.connect`, so it wins over a database name in the URI).
 
-One collection. Mongoose model name `"Lead"` → collection **`leads`**.
+One collection. Mongoose model name `"Lead"` → collection `leads`.
 
 ```text
 leads
@@ -1098,10 +1115,10 @@ VolatilityChart.jsx
 
 High coupling:
 
-- **`server.js` is the whole backend.** A bad edit in the allocator can prevent the file from loading, which also kills leads, stats, and Mongo startup.
-- **`stats.js` shape** is shared by four pages. Renaming `risk` or `strategies` breaks those pages without a type error (this project is JavaScript, not TypeScript).
+- `server.js` **is the whole backend.** A bad edit in the allocator can prevent the file from loading, which also kills leads, stats, and Mongo startup.
+- `stats.js` **shape** is shared by four pages. Renaming `risk` or `strategies` breaks those pages without a type error (this project is JavaScript, not TypeScript).
 - **Lead field names** must match in `Contact.jsx` state, the POST body, and `Lead.js`. There is no shared schema package.
-- **`/api/ml/predict` response field `predicted_return`** must match `Portfolio.jsx` (`result?.predicted_return`). FastAPI and the React check are string-coupled.
+- `/api/ml/predict` **response field** `predicted_return` must match `Portfolio.jsx` (`result?.predicted_return`). FastAPI and the React check are string-coupled.
 - **Chart JSON fields** `dates`, `actual`, `predicted`, `rmse`, `title`, `detail` are coupled to a service whose source is not here.
 - **Mongo connect failure takes down unrelated routes.** Stats do not need a database, but they live in the same process.
 
@@ -1140,48 +1157,63 @@ Low coupling:
 These are behaviors in the current code, not a rewrite.
 
 ### 1. `axios` imported, not installed
+
 `server.js` line 10 imports `axios`. `server/package.json` does not depend on it, and the lockfile has no `axios`. Node fails at startup with a module-not-found error unless someone installed it outside the lockfile. **Serious** for the ML feature and for booting the API. Fix would be adding the dependency or using the `node-fetch` already used by the volatility proxy.
 
 ### 2. ML route registered after the SPA catch-all
+
 `app.get("*")` is registered only when `client/dist` exists, and it is registered before `/api/ml/predict`. Paths under `/api` inside that catch-all return 404. **Serious in the “one process serves the built client” mode.** In local dev without `dist`, the catch-all is skipped and the route works. Fix would be registering `/api/ml/predict` with the other API routes, above the catch-all.
 
 ### 3. ML client hides every error
+
 `fetchReturnPrediction` returns `null`. `runMlPrediction` only checks `predicted_return`. **Moderate.** The button looks like it worked and then shows nothing.
 
 ### 4. FastAPI 400 becomes Express 500
+
 The proxy `catch` does not forward `err.response.status` or `detail`. **Moderate.** Callers cannot tell “bad ticker” from “Python is down”.
 
 ### 5. Prediction uses the last training row
+
 `latest_window = X.iloc[-1]`. That row was inside `fit`. **Moderate if you claim forecast quality.** Fine if you describe it as a demo fit. A real next step would predict from the last 5 returns *after* the last label, or split a test window.
 
 ### 6. Allocator is a fixed formula
+
 Marketing says “ML-driven regime switching”. The code adds 5 or 10 points and clamps volatility. **Serious only if you describe it as a model.** As a demo sandbox it is honest if you say “illustrative”.
 
 ### 7. Chart and proxy disagree
+
 UI calls Render with `symbol` and `window`. Server proxy calls `MODEL_ORIGIN` and also sends `start` and `end`. Python in-repo implements neither. **Serious for explaining ownership:** you cannot debug the volatility math from this repo. **Missing file:** the service that implements `/api/volatility`.
 
 ### 8. Dead and misleading navigation
+
 `Compliance.jsx` is imported and never routed. `/risk` exists but the nav “Risk” link goes to `/portfolio`. Technology route exists; nav link is commented out. `volatility-chart.css` is unused. **Low**, confusing when you demo.
 
 ### 9. CORS expression
+
 `|| "http://localhost:5173" || "http://127.0.0.1:8000/"` — the last term is dead. `MODEL_ORIGIN` is reused as a browser origin. **Moderate** when deploying the client to another host.
 
 ### 10. Mongo is required for non-database routes
+
 Stats, PDF, and allocator die if Mongo is down. **Moderate** for local demos.
 
 ### 11. No auth on lead creation, no rate limit, double submit
+
 **Moderate** on a public URL (spam inserts). Not a read leak, because there is no list endpoint.
 
 ### 12. Contact success check is redundant with Axios
+
 `if (data.ok)` only runs after a 2xx. Fine, slightly noisy.
 
 ### 13. `server.js` logs `MODEL_ORIGIN` at import time
+
 **Low** information leak in logs.
 
 ### 14. Marketing stack is not the code stack
+
 `stats.js` lists TensorFlow, PyTorch, Kubernetes, blockchain. **Serious in an interview if you claim you built those.** The implemented ML stack is scikit-learn linear regression plus a volatility service you did not vendor.
 
 ### 15. JavaScript only
+
 No TypeScript. A renamed JSON field fails at runtime. **Low**, normal for this size.
 
 Stylistic only, not defects: inline styles on the chart versus `styles.css` elsewhere; `Toggle` and `Card` not extracted; both `node-fetch` and `axios` on the server.
